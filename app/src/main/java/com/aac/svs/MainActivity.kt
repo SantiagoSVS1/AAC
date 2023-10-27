@@ -142,9 +142,9 @@ class MainActivity : AppCompatActivity() {
                 put("icon_id", 0)
                 put("image_id", 0)
                 put("text", translatedText)
-                put("mode", "text")}
+                put("mode", "text")
+                put("smart_reply", true)}
             val newRowId = db?.insert("TusDatos", null, values)
-            println("newRowId: $newRowId")
             db.close()
             //refresh fragment
             refreshFragment()
@@ -250,9 +250,9 @@ class MainActivity : AppCompatActivity() {
                 put("image_id", image_id)
                 put("text", text)
                 put("mode", mode)
+                put("smart_reply", false)
             }
             val newRowId = db?.insert("TusDatos", null, values)
-            println("newRowId: $newRowId")
             //close dialog
             add_dialog.dismiss()
             db.close()
