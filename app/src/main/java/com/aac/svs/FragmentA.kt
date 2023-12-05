@@ -17,6 +17,8 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import android.view.Gravity
+import android.view.ScaleGestureDetector
+import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import com.aac.svs.TextToSpeechManager
@@ -30,7 +32,34 @@ class FragmentA : Fragment() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        //initialize text to speech
         textToSpeech = TextToSpeechManager(requireContext())
+        //detect pinch gesture
+        val scaleGestureDetector = ScaleGestureDetector(requireContext(), object : ScaleGestureDetector.OnScaleGestureListener {
+            override fun onScale(detector: ScaleGestureDetector): Boolean {
+                val scaleFactor = detector.scaleFactor
+                if (scaleFactor > 1) {
+                    //scale up
+                    numColumns++
+                    gridLayout.columnCount = numColumns
+                    UpdateGridLayout()
+                } else {
+                    //scale down
+                    if (numColumns > 1) {
+                        numColumns--
+                        gridLayout.columnCount = numColumns
+                        UpdateGridLayout()
+                    }
+                }
+                return true
+            }
+
+            override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
+                return true
+            }
+
+            override fun onScaleEnd(detector: ScaleGestureDetector) {}
+        })
 
     }
 
@@ -41,6 +70,13 @@ class FragmentA : Fragment() {
 
         val view = inflater.inflate(R.layout.fragment_a, container, false)
 
+        //define imageView_delete and add function to delete text in editText_A
+        val imageView_delete = view.findViewById<ImageView>(R.id.imageView_delete)
+        imageView_delete.setOnClickListener {
+            val editText_A = requireActivity().findViewById<EditText>(R.id.editText_A)
+            editText_A.text.clear()
+        }
+        
         gridLayout = view.findViewById(R.id.gridLayout)
 
         // Verificar la orientación de la pantalla
@@ -51,9 +87,6 @@ class FragmentA : Fragment() {
 
 
         UpdateGridLayout()
-
-
-        //smart_reply()
 
         return view
     }
@@ -100,7 +133,7 @@ class FragmentA : Fragment() {
 
         val dbHelper = DatabaseHelper(requireContext())
         val db = dbHelper.readableDatabase
-        val cursor = db.rawQuery("SELECT * FROM TusDatos", null)
+        val cursor = db.rawQuery("SELECT * FROM TusDatos ORDER BY _id DESC", null)
         if (cursor.moveToFirst()) {
             do {
                 val id = cursor.getInt(cursor.getColumnIndexOrThrow("_id"))
@@ -137,7 +170,7 @@ class FragmentA : Fragment() {
                     val linearLayout = GridLayout(requireContext())
                     linearLayout.orientation = GridLayout.VERTICAL
                     linearLayout.addView(imageView)
-                    //linearLayout.addView(textView)
+                    linearLayout.addView(textView)
 
                     gridLayout.addView(linearLayout)
 
@@ -171,6 +204,15 @@ class FragmentA : Fragment() {
 
 
                 }
+
+                //add function to imageView with click, add text to editText_A
+                imageView.setOnClickListener {
+                    val editText_A = requireActivity().findViewById<EditText>(R.id.editText_A)
+                    editText_A.text.append(" "+text)
+                    //textToSpeech.speak(text)
+
+                }
+
                 //add function to imageView with long click
                 imageView.setOnLongClickListener {
                     //delete item from database

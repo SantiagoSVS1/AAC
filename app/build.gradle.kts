@@ -11,7 +11,7 @@ android {
         applicationId = "com.aac.svs"
         minSdk = 28
         targetSdk = 33
-        versionCode = 1
+        versionCode = 3
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -42,6 +42,7 @@ dependencies {
     implementation("com.google.android.material:material:1.9.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     implementation ("com.google.mlkit:smart-reply:17.0.2")
+    //implementation("com.google.android.gms:play-services-mlkit-smart-reply")
     implementation ("com.google.mlkit:translate:17.0.1")
 
     //implementation ("com.google.cloud:google-cloud-translate:2.0.0")

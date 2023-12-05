@@ -39,15 +39,19 @@ import java.util.regex.Pattern
 
 class MainActivity : AppCompatActivity() {
     private lateinit var textToSpeech: TextToSpeechManager
+    //init debug_textview to show debug info
+    lateinit var debug_textview: TextView
+    lateinit var conversation_textview: TextView
     private lateinit var add_dialog: Dialog
     lateinit var PortugueseToEnglish: Translator
     lateinit var EnglishToPortuguese: Translator
     lateinit var conversation : List<TextMessage>
     var popup_checkbox = "unchecked"
-    var last_message = ""
+    var last_message = "Hello, I'm starting the conversation"
     val dbHelper = DatabaseHelper(this)
     val fragmentoA= FragmentA()
-
+    var repeated_replies = 0
+    var cont_replies = 0
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -58,9 +62,22 @@ class MainActivity : AppCompatActivity() {
         SetupMicrophone()
         SetupTranslate()
         SetupConversation()
+
+        debug_textview = findViewById(R.id.debug_textview)
+        conversation_textview = findViewById(R.id.conversation_textview)
         //smart_reply()
         // Text to speech
         textToSpeech = TextToSpeechManager(this)
+
+        //define floating_speak_button
+        val floatingSpeakButton = findViewById<FloatingActionButton>(R.id.floating_speak_button)
+        //listener
+        floatingSpeakButton.setOnClickListener {
+            //get text from editText_A in fragmentA and speak it
+            val editTextA = findViewById<EditText>(R.id.editText_A)
+            val text = editTextA.text.toString()
+            textToSpeech.speak(text)
+        }
     }
 
     fun getImageNamesAndIds(): Pair<List<String>, List<Int>> {
@@ -110,6 +127,7 @@ class MainActivity : AppCompatActivity() {
             if (!textList.isNullOrEmpty()) {
                 val recognizedText = textList[0]
                 println("recognizedText: $recognizedText")
+
                 val translated_text = Port2Eng(recognizedText)
             }
         }
@@ -120,6 +138,7 @@ class MainActivity : AppCompatActivity() {
             .addOnSuccessListener { translatedText = it
             //update conversation
                 //is firts suggestion is not emoji, add to conversation
+
                 update_conversation(last_message, true)
                 update_conversation(translatedText, false)
                 smart_reply()
@@ -137,21 +156,46 @@ class MainActivity : AppCompatActivity() {
             println("translatedText _______: $translatedText")
             //create line to save to database
             val db = dbHelper.writableDatabase
-            val values = ContentValues().apply {
-                put("icon", "ic_empty_button")
-                put("icon_id", 0)
-                put("image_id", 0)
-                put("text", translatedText)
-                put("mode", "text")
-                put("smart_reply", true)}
-            val newRowId = db?.insert("TusDatos", null, values)
+                //verificar si el texto ya existe en la base de datos
+                val cursor = db.rawQuery("SELECT * FROM TusDatos WHERE text = '$translatedText'", null)
+                val values = ContentValues().apply {
+                    put("icon", "ic_empty_button")
+                    put("icon_id", 0)
+                    put("image_id", 0)
+                    put("text", translatedText)
+                    put("mode", "text")
+                    put("smart_reply", true)}
+
+                if (cursor.count == 0) {
+                    //no existe, agregar a la base de datos
+                    db.insert("TusDatos", null, values)
+                }else{
+                    //eliminar el elemento de la base de datos y agregarlo de nuevo
+                    db.delete("TusDatos", "text = '$translatedText'", null)
+                    db.insert("TusDatos", null, values)
+                    
+                    repeated_replies += 1
+                    //imprimir translatedText junto con el elemento que no se agrego
+                    println("translatedText already exist in database:  $translatedText")
+                }
+
+
+
             db.close()
             //refresh fragment
             refreshFragment()
+            debug_textview.text = "$cont_replies replies generated / $repeated_replies repeated \n ___________________________ \n"
             }
             .addOnFailureListener { exception ->
                 println("Falha ao traduzir texto: $exception")
             }
+        //show conversation in conversation_textview
+        conversation_textview.text = ""
+        for (message in conversation) {
+            if (message != null) {
+                conversation_textview.text = conversation_textview.text.toString() + "\n" + message.messageText
+            }
+        }
         return translatedText
 
     }
@@ -276,6 +320,20 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    fun add_to_database(icon: String, icon_id: Int, image_id: Int, text: String, mode: String, smart_reply: Boolean){
+        val db = dbHelper.writableDatabase
+        val values = ContentValues().apply {
+            put("icon", icon)
+            put("icon_id", icon_id)
+            put("image_id", image_id)
+            put("text", text)
+            put("mode", mode)
+            put("smart_reply", smart_reply)
+        }
+        val newRowId = db?.insert("TusDatos", null, values)
+        db.close()
+    }
+
     fun refreshFragment(){
         supportFragmentManager.beginTransaction()
             .replace(R.id.fragmentContainer, FragmentA()) // Reemplaza "fragmentContainer" con el ID de tu contenedor
@@ -308,6 +366,7 @@ class MainActivity : AppCompatActivity() {
 
     fun update_conversation(message: String, user: Boolean = true){
         //add message to conversation
+        println("SVS4 " + message)
         if (user==false){
             //mesagge from remote user
             conversation = conversation + TextMessage.createForRemoteUser(message, System.currentTimeMillis(), "remote_user_id")
@@ -332,6 +391,8 @@ class MainActivity : AppCompatActivity() {
 
 
     fun smart_reply(){
+        repeated_replies = 0
+        cont_replies = 0
         val smartReplyGenerator = SmartReply.getClient(SmartReplyGeneratorOptions.Builder().build())
         smartReplyGenerator.suggestReplies(conversation)
             .addOnSuccessListener { result ->
@@ -344,20 +405,26 @@ class MainActivity : AppCompatActivity() {
                     // ...
                     println("Task completed successfully")
                     val suggestions = result.suggestions
+                    //get len of suggestions and print in debug_textview
+
 
                     for (suggestion in suggestions) {
                         if (isEmoji(suggestion.text)){
                             println("isEmoji")
                         }
                         else{
+                            cont_replies += 1
                             last_message = suggestion.text
+                            if (last_message == ""){
+                                last_message = "ok"
+                                println("last_message CAMBIADO: $last_message")
+                            }
                             val replyText = suggestion.text
                             println("replyText: $replyText")
                             Eng2Port(replyText)
                         }
-
-
                     }
+
                 }
             }
             .addOnFailureListener { exception ->
@@ -391,7 +458,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
 
     override fun onCreate(db: SQLiteDatabase) {
         // Define la estructura de tus tablas y crea las tablas
-        val createTableSQL = "CREATE TABLE TusDatos (_id INTEGER PRIMARY KEY, icon TEXT, icon_id INTEGER, image_id INTEGER, text TEXT, mode TEXT);"
+        val createTableSQL = "CREATE TABLE TusDatos (_id INTEGER PRIMARY KEY, icon TEXT, icon_id INTEGER, image_id INTEGER, text TEXT, mode TEXT, smart_reply BOOLEAN);"
         db.execSQL(createTableSQL)
     }
 
